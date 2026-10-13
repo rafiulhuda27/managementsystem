@@ -1,0 +1,89 @@
+name: Proms CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request: 
+    branches: [main, develop]
+
+permissions: 
+ contents: read
+
+jobs:
+  frontend:
+    name: Build React Frontend
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+       working-directory: frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+          
+     - name: Install dependencies
+        run: npm ci
+
+      - name: Build React
+        run: npm run build
+
+  backend:
+    name: Test Spring Boot
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: proms
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d proms"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/proms
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Run tests and build
+        run: mvn -B clean verify
+
+  docker-compose:
+    name: Validate Docker Compose
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Compose
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: docker compose -f compose.yaml config -q
