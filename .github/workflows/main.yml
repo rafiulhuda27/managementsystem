@@ -90,4 +90,4 @@ jobs:
       - name: Validate Compose
         env:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-        run: docker compose -f compose.yaml config -q
+        run: docker compose -f backend/compose.yaml config -q
